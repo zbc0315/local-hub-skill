@@ -1,7 +1,7 @@
 import click
 
 from hub.verbs.reads import list_, show, search, plan_add
-from hub.verbs.writes import reindex, add
+from hub.verbs.writes import reindex, add, download
 
 
 @click.group()
@@ -16,6 +16,7 @@ cli.add_command(search)
 cli.add_command(plan_add)
 cli.add_command(reindex)
 cli.add_command(add)
+cli.add_command(download)
 
 
 if __name__ == "__main__":

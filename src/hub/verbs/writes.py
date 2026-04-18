@@ -6,9 +6,10 @@ from pathlib import Path
 import click
 
 from ..config import load_config
+from ..downloader import download_and_stage
 from ..index import rebuild_index
 from ..locks import index_lock, slug_lock
-from ..metadata import Frontmatter, write_readme
+from ..metadata import Frontmatter, parse_readme, write_readme
 from ..paths import RootPath
 from ..validators import validate_slug
 
@@ -74,3 +75,26 @@ def add(slug: str, source_url: str, title: str, tags: str, license_: str) -> Non
             rebuild_index(root)
 
     click.echo(f"added {slug}")
+
+
+@click.command("download")
+@click.argument("slug")
+@click.option("--file", "file_url", required=True, help="URL of the file to download")
+def download(slug: str, file_url: str) -> None:
+    """Download a file into the dataset's raw/ directory."""
+    validate_slug(slug)
+    root = _local_root()
+    ds = root / "datasets" / slug
+    if not ds.is_dir():
+        raise click.ClickException(f"no dataset {slug!r}; run `hub add` first")
+
+    with slug_lock(root, slug):
+        name, sha, size = download_and_stage(file_url, ds / "raw")
+        readme = ds / "README.md"
+        fm, body = parse_readme(readme)
+        fm.raw.setdefault("files", [])
+        fm.raw["files"].append({"name": name, "sha256": sha, "size_bytes": size})
+        write_readme(readme, fm, body)
+        with index_lock(root):
+            rebuild_index(root)
+    click.echo(f"downloaded {name} ({size} bytes)")
