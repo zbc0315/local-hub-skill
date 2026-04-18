@@ -45,7 +45,9 @@ def test_pull_during_add_version_reads_prior_version(local_root: Path) -> None:
     from hub.__main__ import cli
 
     class FakeResp:
-        def __init__(self, body: bytes) -> None: self._b = body
+        def __init__(self, body: bytes) -> None:
+            self._b = body
+            self.headers: dict[str, str] = {}
         def iter_content(self, chunk_size: int = 8192):
             yield self._b
         def raise_for_status(self) -> None: ...
@@ -124,7 +126,9 @@ def test_verify_waits_for_concurrent_write_on_same_slug(local_root: Path) -> Non
     from hub.__main__ import cli
 
     class FakeResp:
-        def __init__(self, body: bytes) -> None: self._b = body
+        def __init__(self, body: bytes) -> None:
+            self._b = body
+            self.headers: dict[str, str] = {}
         def iter_content(self, chunk_size: int = 8192):
             yield self._b
         def raise_for_status(self) -> None: ...

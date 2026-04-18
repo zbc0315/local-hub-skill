@@ -11,6 +11,7 @@ from hub.__main__ import cli
 class FakeResponse:
     def __init__(self, body: bytes) -> None:
         self._body = body
+        self.headers: dict[str, str] = {}
     def iter_content(self, chunk_size: int = 8192):
         i = 0
         while i < len(self._body):

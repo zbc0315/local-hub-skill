@@ -15,6 +15,7 @@ from hub.metadata import parse_readme, read_manifest
 class FakeResponse:
     def __init__(self, body: bytes) -> None:
         self._body = body
+        self.headers: dict[str, str] = {}
     def iter_content(self, chunk_size: int = 8192):
         i = 0
         while i < len(self._body):
