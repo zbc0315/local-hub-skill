@@ -1,0 +1,15 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "local-hub-skill",
+  "description": "Shared open-source dataset ledger for cross-project reuse",
+  "owner": {"name": "zbc0315"},
+  "plugins": [
+    {
+      "name": "local-data-hub",
+      "description": "Dataset ledger skill + interactive hub setup command",
+      "source": "./plugins/local-data-hub",
+      "category": "productivity",
+      "homepage": "https://github.com/zbc0315/local-hub-skill"
+    }
+  ]
+}
