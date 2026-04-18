@@ -67,48 +67,57 @@ All writes are atomic (stage → `rename(2)`) and serialized by POSIX file locks
 
 ## Install
 
-### Prerequisites
+### Recommended: via the Claude Code plugin
 
-- Python 3.11 or newer (for `tomllib` in stdlib).
-- `rsync` on `$PATH` (ships with macOS; on Linux `apt install rsync` / `dnf install rsync`).
-- `ssh` client on `$PATH` if you use a remote hub root.
-- [pipx](https://pipx.pypa.io/) recommended for isolated installs: `brew install pipx` or `python -m pip install --user pipx`.
-
-### From this repository
+If you use Claude Code, the easiest path is:
 
 ```bash
-git clone <this repo> local-hub-skill
-cd local-hub-skill
-pipx install -e .
-hub --help
+# One-time: register this repo as a marketplace
+claude plugin marketplace add https://github.com/zbc0315/local-hub-skill.git
+
+# Install the plugin
+claude plugin install local-data-hub@local-hub-skill
 ```
 
-The editable install means code changes take effect without re-installing.
+Then in any Claude Code session run `/local-data-hub:add-root`. The command walks you through configuring a `HUB_ROOT` (local directory or LAN SSH server), installing `hub-cli` on the server if needed, and writing `~/.config/hub/config.toml`. See [Interactive setup](#interactive-setup) below.
 
-If you prefer a plain venv:
+### Manual install (no Claude Code, or CI)
+
+If you want `hub-cli` without the plugin:
 
 ```bash
+pipx install git+https://github.com/zbc0315/local-hub-skill.git
+hub --version
+```
+
+Prerequisites:
+- Python 3.11+
+- `rsync` on `$PATH` (macOS ships it; Debian/Ubuntu: `apt install rsync`; RHEL/CentOS: `dnf install rsync`)
+- `ssh` client if you use a remote hub root
+- [pipx](https://pipx.pypa.io/) (`brew install pipx` or `python -m pip install --user pipx`)
+
+### For development
+
+```bash
+git clone https://github.com/zbc0315/local-hub-skill
+cd local-hub-skill
 python -m venv .venv
 source .venv/bin/activate
 pip install -e '.[dev]'
-hub --help
+pytest          # 105 tests, ~12 s
 ```
 
-> **macOS note:** if your global `~/.npmrc` has `omit=dev`, that's for `npm` only and does not affect `pip`. The `.[dev]` extra installs `pytest` correctly.
-
-### On a remote SSH hub server
-
-If your `HUB_ROOT` is `user@host:/path`, also install `hub-cli` on the server:
+To iterate on the plugin locally (without pushing to GitHub on every change):
 
 ```bash
-ssh user@host
-# on the server:
-pipx install git+https://your-internal-git/local-hub-skill.git
-# or copy the source and:
-pipx install -e /path/to/local-hub-skill
+claude plugin marketplace add ./      # registers this checkout as a marketplace
+claude plugin install local-data-hub@local-hub-skill
+# edit files, then re-sync the marketplace. If `claude plugin marketplace update` is
+# available in your `claude` CLI (run `claude plugin marketplace --help` to check),
+# use it; otherwise, the portable fallback is remove+add:
+claude plugin marketplace remove local-hub-skill
+claude plugin marketplace add ./
 ```
-
-The server side only needs `hub` on its `$PATH` — the client will invoke it as `env HUB_REMOTE_DISPATCH=1 hub --root /path …` over SSH.
 
 ## Configure
 
@@ -402,25 +411,30 @@ The cache is refreshed automatically on every successful unfiltered `hub list`.
 
 ## Companion Claude Code Skill
 
-When used with Claude Code, install the `local-data-hub` Skill so the LLM knows to check the hub before hitting the internet.
+This repo is itself a Claude Code **plugin**. Installing it gives you:
 
-```bash
-skill/scripts/install-hub.sh
-```
+- A **skill** named `local-data-hub` that auto-triggers when a task needs a public/open-source dataset, teaching the LLM to `hub search` / `hub pull` before hitting the internet.
+- A **slash command** `/local-data-hub:add-root` that interactively configures a new `HUB_ROOT`.
 
-This:
+### Interactive setup
 
-1. Installs `hub-cli` via `pipx` from this repo root.
-2. Copies `skill/SKILL.md` and `skill/references/` into `~/.claude/skills/local-data-hub/`.
+After installing the plugin, type `/local-data-hub:add-root` in any Claude Code session. The flow:
 
-The Skill teaches the LLM to:
+1. Checks your current state (existing config, whether `hub` is installed, legacy loose-skill presence).
+2. Asks whether the hub should live locally or on an SSH-reachable server.
+3. For remote: collects host/port/user/path and probes the server's Python environment via a subagent.
+4. Manages `~/.ssh/config` — reuses an existing alias if it matches, otherwise proposes a new one.
+5. Installs `hub-cli` on the server (via `pipx` if available, else `pip install --user`).
+6. Creates the hub root directory.
+7. Writes `~/.config/hub/config.toml` and verifies end-to-end with `hub list`.
 
-- `hub search <keywords>` before falling back to WebSearch / download.
-- Use `hub plan-add <url>` to show candidates and wait for user confirmation.
-- Register with `hub add`, fetch with `hub download`, process with `hub add-version` only when the result is reusable across projects.
-- Never edit `INDEX.md` by hand, never `add-version` for one-off project-private derivations, never add datasets with unknown licenses without asking the user.
+Every destructive or impactful action requires explicit user confirmation. The flow is idempotent — re-running it detects existing state and either reuses it or asks before overwriting.
 
-See `skill/SKILL.md` for the exact trigger description and decision tree.
+### Trigger behavior (skill)
+
+The `local-data-hub` skill activates when Claude Code detects the user's task needs a dataset. See [`plugins/local-data-hub/skills/local-data-hub/SKILL.md`](plugins/local-data-hub/skills/local-data-hub/SKILL.md) for the exact trigger description and decision tree.
+
+**Does NOT apply to** project-generated data, user-provided one-off files, private business data, or ad-hoc web scraping — only public/reusable datasets.
 
 ## Development
 
