@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import os
 import sys
+import time
 
 import click
 
+from hub.cache import hub_id, cache_dir_for, read_cached_index, write_cached_index
 from hub.config import load_config, Config
 from hub.paths import RootPath
-from hub.remote import run_remote
+from hub.remote import run_remote_captured
 from hub.verbs.reads import list_, show, search, plan_add
 from hub.verbs.writes import reindex, add, download, verify, rm
 from hub.verbs.add_version import add_version
@@ -73,12 +75,66 @@ def _should_dispatch_remote(args: list[str]) -> bool:
 
 def main() -> None:
     args = sys.argv[1:]
-    if _should_dispatch_remote(args):
-        cfg = load_config()
-        rp = RootPath.parse(cfg.root)
-        code = run_remote(user=rp.user, host=rp.host, remote_path=rp.path, subcommand=args)
-        sys.exit(code)
-    cli()
+    if not _should_dispatch_remote(args):
+        cli()
+        return
+
+    cfg = load_config()
+    rp = RootPath.parse(cfg.root)
+    sub = _extract_subcommand(args)
+
+    rc, stdout, stderr = run_remote_captured(
+        user=rp.user, host=rp.host, remote_path=rp.path, subcommand=args,
+    )
+
+    if rc == 0:
+        if sub == "list" and "--tag" not in args and not any(a.startswith("--tag=") for a in args):
+            write_cached_index(cfg.root, stdout)
+        sys.stdout.write(stdout); sys.stderr.write(stderr)
+        sys.exit(0)
+
+    if sub == "list":
+        cached = read_cached_index(cfg.root)
+        if cached is not None:
+            mtime = (cache_dir_for(cfg.root) / "INDEX.md").stat().st_mtime
+            sys.stderr.write(
+                f"warning: offline — using cached INDEX (mtime {time.ctime(mtime)})\n"
+            )
+            sys.stdout.write(cached)
+            sys.exit(0)
+        sys.stderr.write("error: remote unreachable and no cached INDEX\n")
+        sys.exit(2)
+
+    if sub == "search":
+        cached = read_cached_index(cfg.root)
+        if cached is None:
+            sys.stderr.write(
+                "error: remote unreachable and no cached INDEX; run `hub list` online first\n"
+            )
+            sys.exit(2)
+        query = ""
+        seen_sub = False
+        for a in args:
+            if not seen_sub:
+                if a == "search":
+                    seen_sub = True
+                continue
+            if not a.startswith("-"):
+                query = a
+                break
+        for line in cached.splitlines():
+            if query.lower() in line.lower():
+                sys.stdout.write(line + "\n")
+        sys.exit(0)
+
+    if sub == "show":
+        sys.stderr.write(
+            "error: show not available offline; run `hub list` online to refresh cache\n"
+        )
+        sys.exit(2)
+
+    sys.stdout.write(stdout); sys.stderr.write(stderr)
+    sys.exit(rc)
 
 
 if __name__ == "__main__":

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import subprocess
-import sys
 from typing import Sequence
 
 SSH_OPTS = [
@@ -18,17 +17,16 @@ def build_ssh_argv(*, user: str, host: str, remote_hub_cmd: Sequence[str]) -> li
     return ["ssh", *SSH_OPTS, f"{user}@{host}", *remote]
 
 
-def run_remote(user: str, host: str, remote_path: str, subcommand: Sequence[str]) -> int:
-    """Run `hub --root <remote_path> <subcommand...>` on the remote host.
+def run_remote_captured(*, user: str, host: str, remote_path: str,
+                        subcommand: Sequence[str]) -> tuple[int, str, str]:
+    """Run `hub --root <remote_path> <subcommand...>` on `user@host`.
 
-    Streams stdout/stderr back to this process's stdout/stderr. Returns exit code.
+    Returns (returncode, stdout, stderr). Never raises on SSH failure.
     """
-    argv = build_ssh_argv(
-        user=user,
-        host=host,
-        remote_hub_cmd=["hub", "--root", remote_path, *subcommand],
-    )
-    proc = subprocess.run(argv, shell=False, capture_output=True)
-    sys.stdout.write(proc.stdout.decode())
-    sys.stderr.write(proc.stderr.decode())
-    return proc.returncode
+    argv = build_ssh_argv(user=user, host=host,
+                          remote_hub_cmd=["hub", "--root", remote_path, *subcommand])
+    try:
+        proc = subprocess.run(argv, shell=False, capture_output=True, timeout=30)
+    except subprocess.TimeoutExpired:
+        return 255, "", "ssh timed out\n"
+    return proc.returncode, proc.stdout.decode(), proc.stderr.decode()
