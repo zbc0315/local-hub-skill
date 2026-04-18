@@ -1,0 +1,25 @@
+{
+  "jsonl_file": "0f45dd13-139b-4788-9756-e965ab8bc6f3.jsonl",
+  "started_at": "2026-04-18T07:58:43.054Z",
+  "ended_at": "2026-04-18T16:40:29.126Z",
+  "turns": 45,
+  "summary": "我想创建一个 Skill，背景是这样的，当我们开发多个项目的时候，这些项目可能会用到互相重复的开源数",
+  "original_tokens": 28701,
+  "sync_status": "complete",
+  "versions": {
+    "v0": {
+      "file": "v0.md",
+      "tokens": 28701
+    }
+  },
+  "latest": "v0",
+  "cohesion_map": {},
+  "expand_stats": {
+    "total_llm": 0,
+    "total_user": 0,
+    "by_turn": {},
+    "recent": []
+  },
+  "reorganize_count": 0,
+  "last_reorganize_at": null
+}
