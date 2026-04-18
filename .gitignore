@@ -1,0 +1,17 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+dist/
+build/
+.venv/
+.env
+
+# Dev process docs — kept out of git per plan note
+docs/superpowers/
+
+# Editor noise
+.DS_Store
+.idea/
+.vscode/
