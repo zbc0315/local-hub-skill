@@ -107,3 +107,28 @@ def test_add_version_refuses_existing(tmp_path: Path, monkeypatch: pytest.Monkey
     ])
     assert second.exit_code != 0
     assert "already exists" in second.output.lower()
+
+
+def test_add_version_refuses_remote_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """With a remote HUB_ROOT, add-version is blocked at main() dispatch AND gives a clear error from _local_root if reached directly."""
+    monkeypatch.setenv("HUB_ROOT", "jim@nas.lan:/srv/data-hub")
+
+    # At dispatch level: add-version is in _NEVER_REMOTE, so main() does NOT ssh.
+    import sys
+    from unittest.mock import patch, MagicMock
+    monkeypatch.setattr(sys, "argv", ["hub", "add-version", "tiny", "v1",
+                                       "--script", str(tmp_path / "x.py"), "--input", "raw"])
+    (tmp_path / "x.py").write_text("#!/usr/bin/env python\n")
+    (tmp_path / "x.py").chmod(0o755)
+    fake_ssh = MagicMock()
+    fake_ssh.returncode = 0
+    fake_ssh.stdout = b""
+    fake_ssh.stderr = b""
+    with patch("hub.remote.subprocess.run", return_value=fake_ssh) as m:
+        from hub.__main__ import main
+        with pytest.raises(SystemExit):
+            main()
+    # Must NOT have attempted ssh.
+    for call in m.call_args_list:
+        argv = call.args[0] if call.args else call.kwargs.get("args", [])
+        assert argv[0] != "ssh", f"add-version should not remote-dispatch: {argv}"

@@ -32,7 +32,7 @@ cli.add_command(verify); cli.add_command(rm)
 cli.add_command(add_version); cli.add_command(pull)
 
 
-_NEVER_REMOTE = {"pull"}
+_NEVER_REMOTE = {"pull", "add-version"}
 _VALUE_OPTIONS = {"--root"}
 
 

@@ -22,7 +22,11 @@ def _local_root() -> tuple[Path, int]:
     cfg = load_config()
     rp = RootPath.parse(cfg.root)
     if rp.is_remote:
-        raise click.ClickException("remote root not yet supported by this verb")
+        raise click.ClickException(
+            "hub add-version cannot be used with a remote HUB_ROOT — "
+            "the script file must live on the same machine as the hub. "
+            "Copy the script to the server and run `hub add-version` there."
+        )
     return Path(rp.local_path), cfg.script_timeout
 
 
