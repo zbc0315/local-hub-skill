@@ -69,3 +69,47 @@ def test_download_rejects_unknown_slug(tmp_path: Path, monkeypatch: pytest.Monke
         "download", "missing", "--file", "https://e.com/x.csv",
     ])
     assert result.exit_code != 0
+
+
+def test_download_prompts_over_threshold_and_aborts_when_declined(
+    added_slug: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """If size > threshold and user declines, download must not happen."""
+    monkeypatch.setenv("HUB_ROOT", str(added_slug))
+    # Config default is 500 MB. Override via a test config file so any small body triggers.
+    cfg_dir = added_slug / ".config" / "hub"
+    cfg_dir.mkdir(parents=True)
+    (cfg_dir / "config.toml").write_text(
+        f'root = "{added_slug}"\nconfirm_download_above = 5\n'
+    )
+    monkeypatch.setenv("HOME", str(added_slug))
+    body = b"col1,col2\n1,2\n"
+    with patch("hub.downloader.requests.get", return_value=FakeResponse(body)):
+        result = CliRunner().invoke(cli, [
+            "download", "tiny",
+            "--file", "https://example.com/tiny.csv",
+        ], input="n\n")
+    assert result.exit_code != 0
+    ds = added_slug / "datasets" / "tiny"
+    assert not (ds / "raw" / "tiny.csv").exists()
+
+
+def test_download_prompts_over_threshold_and_proceeds_when_accepted(
+    added_slug: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    cfg_dir = added_slug / ".config" / "hub"
+    cfg_dir.mkdir(parents=True)
+    (cfg_dir / "config.toml").write_text(
+        f'root = "{added_slug}"\nconfirm_download_above = 5\n'
+    )
+    monkeypatch.setenv("HOME", str(added_slug))
+    monkeypatch.setenv("HUB_ROOT", str(added_slug))
+    body = b"col1,col2\n1,2\n"
+    with patch("hub.downloader.requests.get", return_value=FakeResponse(body)):
+        result = CliRunner().invoke(cli, [
+            "download", "tiny",
+            "--file", "https://example.com/tiny.csv",
+        ], input="y\n")
+    assert result.exit_code == 0, result.output
+    ds = added_slug / "datasets" / "tiny"
+    assert (ds / "raw" / "tiny.csv").read_bytes() == body

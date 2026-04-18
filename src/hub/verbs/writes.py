@@ -86,13 +86,29 @@ def add(slug: str, source_url: str, title: str, tags: str, license_: str) -> Non
 def download(slug: str, file_url: str) -> None:
     """Download a file into the dataset's raw/ directory."""
     validate_slug(slug)
+    cfg = load_config()
     root = _local_root()
     ds = root / "datasets" / slug
     if not ds.is_dir():
         raise click.ClickException(f"no dataset {slug!r}; run `hub add` first")
 
+    def _confirm(size_bytes: int) -> bool:
+        mb = size_bytes / (1024 * 1024)
+        threshold_mb = cfg.confirm_download_above / (1024 * 1024)
+        return click.confirm(
+            f"download is {mb:.1f} MB (threshold {threshold_mb:.0f} MB). Continue?",
+            default=False,
+        )
+
     with slug_lock(root, slug):
-        name, sha, size = download_and_stage(file_url, ds / "raw")
+        try:
+            name, sha, size = download_and_stage(
+                file_url, ds / "raw",
+                confirm_threshold=cfg.confirm_download_above,
+                confirm_fn=_confirm,
+            )
+        except RuntimeError as e:
+            raise click.ClickException(str(e))
         readme = ds / "README.md"
         fm, body = parse_readme(readme)
         fm.raw.setdefault("files", [])
