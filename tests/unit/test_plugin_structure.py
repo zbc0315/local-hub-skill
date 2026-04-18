@@ -106,3 +106,24 @@ def test_add_root_command_body_is_substantial() -> None:
     for phase_marker in ("Phase 0", "Phase 1", "Phase 2", "Phase 3",
                          "Phase 4", "Phase 5", "Phase 6", "Phase 7"):
         assert phase_marker in body, f"add-root.md missing {phase_marker}"
+
+
+# --- claude plugin validate (loopback) ----------------------------------------
+
+import shutil
+import subprocess
+
+
+def test_claude_plugin_validate() -> None:
+    """Run `claude plugin validate` on the plugin dir. Skip if `claude` not on PATH."""
+    claude = shutil.which("claude")
+    if not claude:
+        pytest.skip("`claude` CLI not available")
+    plugin_dir = REPO_ROOT / "plugins" / "local-data-hub"
+    r = subprocess.run(
+        [claude, "plugin", "validate", str(plugin_dir)],
+        capture_output=True, text=True, timeout=30,
+    )
+    assert r.returncode == 0, (
+        f"claude plugin validate failed\nstdout:\n{r.stdout}\nstderr:\n{r.stderr}"
+    )
