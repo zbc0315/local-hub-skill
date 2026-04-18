@@ -27,11 +27,17 @@ def run_remote_captured(*, user: str, host: str, remote_path: str,
     """Run `hub --root <remote_path> <subcommand...>` on `user@host`.
 
     Returns (returncode, stdout, stderr). Never raises on SSH failure.
+
+    No timeout is enforced — remote writes (`download`, `add-version`, `verify`
+    on a hashed big dataset) can legitimately take minutes to hours. A 30-second
+    timeout was the original behavior and broke any non-trivial operation. If
+    the user needs to abort, Ctrl-C kills the local ssh process, which sends
+    SIGHUP to the remote command.
     """
     argv = build_ssh_argv(user=user, host=host,
                           remote_hub_cmd=["hub", "--root", remote_path, *subcommand])
     try:
-        proc = subprocess.run(argv, shell=False, capture_output=True, timeout=30)
-    except subprocess.TimeoutExpired:
+        proc = subprocess.run(argv, shell=False, capture_output=True, timeout=None)
+    except subprocess.TimeoutExpired:  # pragma: no cover — unreachable with timeout=None
         return 255, "", "ssh timed out\n"
     return proc.returncode, proc.stdout.decode(), proc.stderr.decode()
