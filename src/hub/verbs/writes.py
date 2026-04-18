@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import hashlib
+import os
+import shutil
 from datetime import date
 from pathlib import Path
 
@@ -169,3 +171,25 @@ def verify(slug: str | None) -> None:
             click.echo(f, err=True)
         raise click.ClickException(f"{len(all_failures)} verification failure(s)")
     click.echo(f"ok ({len(targets)} dataset(s))")
+
+
+@click.command("rm")
+@click.argument("slug")
+@click.option("--yes", is_flag=True, help="required confirmation")
+def rm(slug: str, yes: bool) -> None:
+    """Delete a dataset directory. Requires --yes."""
+    validate_slug(slug)
+    if not yes:
+        raise click.ClickException("refusing to delete without --yes")
+    root = _local_root()
+    ds = root / "datasets" / slug
+    if not ds.is_dir():
+        raise click.ClickException(f"no dataset {slug!r}")
+
+    deleting = root / "datasets" / f"{slug}.deleting"
+    with slug_lock(root, slug):
+        os.rename(ds, deleting)
+        shutil.rmtree(deleting)
+        with index_lock(root):
+            rebuild_index(root)
+    click.echo(f"removed {slug}")
