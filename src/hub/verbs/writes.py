@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 from datetime import date
 from pathlib import Path
 
@@ -98,3 +99,73 @@ def download(slug: str, file_url: str) -> None:
         with index_lock(root):
             rebuild_index(root)
     click.echo(f"downloaded {name} ({size} bytes)")
+
+
+def _sha256_file(path: Path) -> str:
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(64 * 1024), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def _verify_one(root: Path, slug: str) -> list[str]:
+    """Return a list of failure messages. Empty list means OK."""
+    failures: list[str] = []
+    ds = root / "datasets" / slug
+    fm, _ = parse_readme(ds / "README.md")
+    for rec in fm.raw.get("files", []):
+        p = ds / "raw" / rec["name"]
+        if not p.exists():
+            failures.append(f"{slug}/raw/{rec['name']}: missing")
+            continue
+        actual = _sha256_file(p)
+        if actual != rec["sha256"]:
+            failures.append(f"{slug}/raw/{rec['name']}: sha256 mismatch")
+        if p.stat().st_size != rec["size_bytes"]:
+            failures.append(f"{slug}/raw/{rec['name']}: size mismatch")
+    for v in fm.versions:
+        vdir = ds / "versions" / v["name"]
+        manifest_path = vdir / "manifest.json"
+        if not manifest_path.exists():
+            failures.append(f"{slug}/versions/{v['name']}: missing manifest.json")
+            continue
+        import json
+        m = json.loads(manifest_path.read_text())
+        for of in m.get("output_files", []):
+            p = vdir / of["name"]
+            if not p.exists():
+                failures.append(f"{slug}/versions/{v['name']}/{of['name']}: missing")
+                continue
+            if _sha256_file(p) != of["sha256"]:
+                failures.append(f"{slug}/versions/{v['name']}/{of['name']}: sha256 mismatch")
+            if p.stat().st_size != of["size_bytes"]:
+                failures.append(f"{slug}/versions/{v['name']}/{of['name']}: size mismatch")
+    return failures
+
+
+@click.command("verify")
+@click.argument("slug", required=False)
+def verify(slug: str | None) -> None:
+    """Rehash files and compare to recorded sha256 / size."""
+    root = _local_root()
+    if slug is not None:
+        validate_slug(slug)
+        targets = [slug]
+    else:
+        datasets_dir = root / "datasets"
+        if not datasets_dir.is_dir():
+            click.echo("ok (0 dataset(s))")
+            return
+        targets = sorted(p.name for p in datasets_dir.iterdir() if p.is_dir())
+
+    all_failures: list[str] = []
+    for t in targets:
+        with slug_lock(root, t):
+            all_failures.extend(_verify_one(root, t))
+
+    if all_failures:
+        for f in all_failures:
+            click.echo(f, err=True)
+        raise click.ClickException(f"{len(all_failures)} verification failure(s)")
+    click.echo(f"ok ({len(targets)} dataset(s))")
