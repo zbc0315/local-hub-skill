@@ -123,6 +123,9 @@ def main() -> None:
                 query = a
                 break
         for line in cached.splitlines():
+            # Only match actual data rows (pipe-delimited, not the separator).
+            if not line.startswith("|") or "---" in line:
+                continue
             if query.lower() in line.lower():
                 sys.stdout.write(line + "\n")
         sys.exit(0)
