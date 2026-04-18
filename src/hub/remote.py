@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import shlex
 import subprocess
 from typing import Sequence
 
@@ -10,10 +11,14 @@ SSH_OPTS = [
 
 
 def build_ssh_argv(*, user: str, host: str, remote_hub_cmd: Sequence[str]) -> list[str]:
-    # Wrap the remote command in `env HUB_REMOTE_DISPATCH=1 <cmd>` so the
-    # server-side hub knows not to re-dispatch. Each element is a separate
-    # argv item — no shell string interpolation.
-    remote = ["env", "HUB_REMOTE_DISPATCH=1", *remote_hub_cmd]
+    # OpenSSH joins the remote-command argv into a single shell string for the
+    # server-side login shell (`sh -c "<joined>"`), so any space/paren/quote in
+    # a value would be re-parsed remotely and break argv boundaries. Apply
+    # `shlex.quote` to every element of the hub command before shipping.
+    # The `env HUB_REMOTE_DISPATCH=1` prefix is our own fixed constant and
+    # does not need quoting.
+    quoted = [shlex.quote(a) for a in remote_hub_cmd]
+    remote = ["env", "HUB_REMOTE_DISPATCH=1", *quoted]
     return ["ssh", *SSH_OPTS, f"{user}@{host}", *remote]
 
 

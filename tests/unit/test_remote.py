@@ -16,7 +16,34 @@ def test_build_ssh_argv_uses_argv_not_shell() -> None:
     assert "jim@nas.lan" in argv
     tail = argv[argv.index("jim@nas.lan") + 1:]
     assert tail[:2] == ["env", "HUB_REMOTE_DISPATCH=1"]
+    # Plain tokens (no spaces/special chars) survive shlex.quote unchanged.
     assert tail[2:] == ["hub", "--root", "/srv/data-hub", "list", "--tag", "t"]
+
+
+def test_build_ssh_argv_shell_quotes_values_with_spaces_or_parens() -> None:
+    """Values with spaces, parens, or shell metachars must be shell-quoted so
+    OpenSSH's remote-shell join doesn't re-parse them into multiple tokens."""
+    argv = build_ssh_argv(
+        user="jim", host="nas.lan",
+        remote_hub_cmd=[
+            "hub", "--root", "/srv/data-hub",
+            "add", "slug",
+            "--title", "USPTO Reactions 1976-2016 (Lowe)",
+            "--tags", "a, b,c",
+        ],
+    )
+    tail = argv[argv.index("jim@nas.lan") + 1:]
+    # env prefix unchanged
+    assert tail[:2] == ["env", "HUB_REMOTE_DISPATCH=1"]
+    # Title and tags are shell-quoted; the rest are plain
+    quoted_title = "'USPTO Reactions 1976-2016 (Lowe)'"
+    quoted_tags = "'a, b,c'"
+    assert tail[2:] == [
+        "hub", "--root", "/srv/data-hub",
+        "add", "slug",
+        "--title", quoted_title,
+        "--tags", quoted_tags,
+    ]
 
 
 def _fake_proc(returncode: int = 0, stdout: bytes = b"", stderr: bytes = b"") -> MagicMock:
