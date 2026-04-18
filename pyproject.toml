@@ -22,7 +22,7 @@ dev = [
 ]
 
 [project.scripts]
-hub = "hub.__main__:cli"
+hub = "hub.__main__:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
