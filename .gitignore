@@ -11,6 +11,11 @@ build/
 # Dev process docs — kept out of git per plan note
 docs/superpowers/
 
+# Per-project Claude Code context + task tracking (contain server IP / paths)
+CLAUDE.md
+TODO.md
+DETAILS/
+
 # Editor noise
 .DS_Store
 .idea/
