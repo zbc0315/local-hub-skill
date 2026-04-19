@@ -22,7 +22,19 @@ Registers a new dataset (creates directory + stub README). Triggers reindex.
 
 ### `hub download <slug> --file <path-or-url>`
 Fetches a file into `raw/`. Stages at `raw/.partial/<name>`, renames on sha256 verification.
-Records sha256 + size in README. Triggers reindex.
+The filename is taken from the response's `Content-Disposition` header when present (so
+figshare-style `ndownloader/files/<id>` URLs save with their real name), falling back to
+the URL path's last segment. Records sha256 + size in README. Triggers reindex.
+
+### `hub import-file <slug> <local-path> [--as <name>]`
+Copy an **existing local file** into a dataset's `raw/` directory — the manual-import
+counterpart to `hub download`. Same atomic semantics (stage → sha256 → rename → update
+README → reindex). Use when the hub machine can't fetch from the URL directly (e.g.
+GitHub raw blocked from server network, Box/Drive session-only links): `scp` the file
+to the hub host, then `hub import-file <slug> /path/to/file`. Use `--as <name>` to
+override the stored filename (e.g. when source is a figshare numeric-ID path).
+Only works with a **local** `HUB_ROOT` — remote hubs require `ssh <host> hub import-file ...`
+run on the server itself.
 
 ### `hub add-version <slug> <version-name> --script <path> --input <raw|<ver>>`
 Runs the script over the input version. See "Script convention" below.

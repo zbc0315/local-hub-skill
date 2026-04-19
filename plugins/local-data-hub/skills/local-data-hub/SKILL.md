@@ -44,7 +44,8 @@ Need data?
 |---|---|
 | `hub plan-add <query-or-url>` | JSON candidate list — does NOT download |
 | `hub add <slug> --source <url> --title ...` | register a new dataset (stub) |
-| `hub download <slug> --file <url>` | fetch into `raw/` |
+| `hub download <slug> --file <url>` | fetch into `raw/` (uses `Content-Disposition` filename when present) |
+| `hub import-file <slug> <local-path> [--as <name>]` | import an already-local file into `raw/` (when URL fetching fails) |
 | `hub add-version <slug> <ver> --script <path> --input raw\|<ver>` | create a processed version |
 | `hub pull <slug> [--version <ver>] <dest>` | rsync into your project workspace |
 | `hub reindex` | rebuild INDEX.md |
