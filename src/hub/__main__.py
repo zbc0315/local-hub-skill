@@ -11,7 +11,7 @@ from hub.config import load_config, Config
 from hub.paths import RootPath
 from hub.remote import run_remote_captured
 from hub.verbs.reads import list_, show, search, plan_add
-from hub.verbs.writes import reindex, add, download, verify, rm
+from hub.verbs.writes import reindex, add, download, verify, rm, import_file
 from hub.verbs.add_version import add_version
 from hub.verbs.pull import pull
 
@@ -29,10 +29,10 @@ def cli(root_override: str | None) -> None:
 cli.add_command(list_); cli.add_command(show); cli.add_command(search); cli.add_command(plan_add)
 cli.add_command(reindex); cli.add_command(add); cli.add_command(download)
 cli.add_command(verify); cli.add_command(rm)
-cli.add_command(add_version); cli.add_command(pull)
+cli.add_command(add_version); cli.add_command(pull); cli.add_command(import_file)
 
 
-_NEVER_REMOTE = {"pull", "add-version"}
+_NEVER_REMOTE = {"pull", "add-version", "import-file"}
 _VALUE_OPTIONS = {"--root"}
 
 

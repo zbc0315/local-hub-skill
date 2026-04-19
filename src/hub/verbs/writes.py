@@ -209,3 +209,75 @@ def rm(slug: str, yes: bool) -> None:
         with index_lock(root):
             rebuild_index(root)
     click.echo(f"removed {slug}")
+
+
+@click.command("import-file")
+@click.argument("slug")
+@click.argument("source_path", type=click.Path(exists=True, dir_okay=False, readable=True))
+@click.option("--as", "target_name", default=None,
+              help="target filename under raw/ (default: basename of SOURCE_PATH)")
+def import_file(slug: str, source_path: str, target_name: str | None) -> None:
+    """Copy a local file into a dataset's raw/ directory and register it.
+
+    Useful when the file cannot be fetched directly over HTTP (e.g., GitHub
+    raw content is unreachable from the hub's network, Box/Google Drive
+    session-only links). `scp` the file to the hub machine, then:
+
+        hub import-file <slug> /path/to/local/file
+
+    Only works with a local HUB_ROOT — with a remote root, the file path
+    refers to the client, not the server. Copy the file to the server and
+    run `hub import-file` there (with HUB_ROOT set to the server's local path).
+    """
+    validate_slug(slug)
+    root = _local_root()
+    ds = root / "datasets" / slug
+    if not ds.is_dir():
+        raise click.ClickException(f"no dataset {slug!r}; run `hub add` first")
+
+    src = Path(source_path)
+    name = target_name if target_name else src.name
+    if not name:
+        raise click.ClickException("cannot derive target filename — use --as <name>")
+
+    raw_dir = ds / "raw"
+    raw_dir.mkdir(exist_ok=True)
+
+    with slug_lock(root, slug):
+        final = raw_dir / name
+        if final.exists():
+            raise click.ClickException(
+                f"{final} already exists — remove it first or use --as to pick a different name"
+            )
+
+        partial_dir = raw_dir / ".partial"
+        partial_dir.mkdir(exist_ok=True)
+        staging = partial_dir / name
+
+        h = hashlib.sha256()
+        size = 0
+        with open(src, "rb") as fi, open(staging, "wb") as fo:
+            for chunk in iter(lambda: fi.read(64 * 1024), b""):
+                h.update(chunk)
+                fo.write(chunk)
+                size += len(chunk)
+
+        os.rename(staging, final)
+        if not any(partial_dir.iterdir()):
+            partial_dir.rmdir()
+
+        readme = ds / "README.md"
+        fm, body = parse_readme(readme)
+        fm.raw.setdefault("files", [])
+        fm.raw["files"].append({
+            "name": name,
+            "sha256": h.hexdigest(),
+            "size_bytes": size,
+        })
+        write_readme(readme, fm, body)
+
+        with index_lock(root):
+            rebuild_index(root)
+
+    click.echo(f"imported {name} ({size} bytes)")
+    click.echo(f"removed {slug}")
