@@ -1,7 +1,7 @@
 {
   "name": "local-data-hub",
   "description": "Shared open-source dataset ledger — skill for dataset discovery plus an interactive setup command",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "author": {"name": "zbc0315"},
   "license": "MIT",
   "repository": "https://github.com/zbc0315/local-hub-skill"
